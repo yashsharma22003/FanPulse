@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Direction {
+  UP
+  DOWN
+}
+
+enum PredictionStatus {
+  PENDING
+  OPEN
+  LOCKED
+  EXPIRED
+}
+
+enum ChallengeStatus {
+  LOCKED
+  RESOLVED
+  VOIDED
+  EXPIRED
+}
+
+enum AiStatus {
+  IDLE
+  PENDING
+  READY
+  FAILED
+}
+
+model User {
+  id              String   @id @default(cuid())
+  wallet          String   @unique
+  challengeEnergy Decimal  @default(0) @db.Decimal(18, 8)
+  challengeRating Int      @default(1000)
+  wins            Int      @default(0)
+  losses          Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  predictions   Prediction[]
+  challengesWon Challenge[]  @relation("ChallengeWinner")
+  ratingEvents  RatingEvent[]
+}
+
+model Market {
+  id            String   @id @default(cuid())
+  marketId      String   @unique
+  asset         String
+  intervalSec   Int
+  tradingStart  DateTime?
+  expiry        DateTime
+  pool          String?
+  venueId       String?
+  upSymbol      String?
+  downSymbol    String?
+  onchainStatus Int      @default(1)
+  aiProbability Int?
+  aiRequestId   String?
+  aiStatus      AiStatus @default(IDLE)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  predictions Prediction[]
+}
+
+model Prediction {
+  id                 String           @id @default(cuid())
+  userId             String
+  user               User             @relation(fields: [userId], references: [id])
+  marketRowId        String
+  market             Market           @relation(fields: [marketRowId], references: [id])
+  direction          Direction
+  confidence         Decimal          @db.Decimal(5, 4)
+  quantity           Decimal          @db.Decimal(28, 8)
+  quantityFilled     Decimal          @default(0) @db.Decimal(28, 8)
+  orderId            String?
+  txHash             String?
+  yesId              String?
+  noId               String?
+  status             PredictionStatus @default(PENDING)
+  challengeExpiresAt DateTime?
+  challengingOfId    String?
+  challengingOf      Prediction?      @relation("ChallengeAttempt", fields: [challengingOfId], references: [id])
+  challengeAttempts  Prediction[]     @relation("ChallengeAttempt")
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  originalChallenge    Challenge? @relation("OriginalPrediction")
+  challengerChallenge  Challenge? @relation("ChallengerPrediction")
+
+  @@index([status, challengeExpiresAt])
+  @@index([marketRowId, status])
+}
+
+model Challenge {
+  id                     String          @id @default(cuid())
+  originalPredictionId   String          @unique
+  originalPrediction     Prediction      @relation("OriginalPrediction", fields: [originalPredictionId], references: [id])
+  challengerPredictionId String          @unique
+  challengerPrediction   Prediction      @relation("ChallengerPrediction", fields: [challengerPredictionId], references: [id])
+  status                 ChallengeStatus @default(LOCKED)
+  winnerUserId           String?
+  winner                 User?           @relation("ChallengeWinner", fields: [winnerUserId], references: [id])
+  multiplier             Decimal         @default(1) @db.Decimal(8, 4)
+  energyPaid             Decimal         @default(0) @db.Decimal(18, 8)
+  resolvedAt             DateTime?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  ratingEvents RatingEvent[]
+
+  @@index([status])
+}
+
+model RatingEvent {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  challengeId  String
+  challenge    Challenge @relation(fields: [challengeId], references: [id])
+  input        Json
+  ratingBefore Int
+  ratingAfter  Int
+  createdAt    DateTime @default(now())
+}
+
+model AuthNonce {
+  id        String   @id @default(cuid())
+  nonce     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
