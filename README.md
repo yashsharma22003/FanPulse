@@ -18,7 +18,9 @@ npx prisma migrate dev --name init
 npm run start:dev
 ```
 
-Env of note: `DATABASE_URL`, `JWT_SECRET`, `RPC_URL` / `RPC_URL_FALLBACK`, `WS_RPC_URL`, `INDEXER_URL`, `SOMNIA_LLM_AGENT_ID`, `AGENTS_PRIVATE_KEY` (protocol wallet, STT only — not user funds). Get the LLM agent id from [agents.testnet.somnia.network](https://agents.testnet.somnia.network). Optional `AGENTS_CALLBACK_ADDRESS` after deploying `contracts/AgentCallback.sol`.
+Frontend (`frontend/`): `cd frontend && npm install && npm run dev` → `http://localhost:5173`. SIWE domain/uri must match that origin.
+
+Env of note: `DATABASE_URL`, `JWT_SECRET`, `RPC_URL` / `RPC_URL_FALLBACK`, `WS_RPC_URL`, `INDEXER_URL`, `SOMNIA_LLM_AGENT_ID`, `AGENTS_PRIVATE_KEY` (protocol wallet, STT only — not user funds). Get the LLM agent id from [agents.testnet.somnia.network](https://agents.testnet.somnia.network). Optional `AGENTS_CALLBACK_ADDRESS` after deploying `contracts/AgentCallback.sol`. Optional `FAN_NFT_ADDRESS` after deploying `contracts/FanNFT.sol` (protocol wallet is owner; gas from `FAN_NFT_PRIVATE_KEY` or `AGENTS_PRIVATE_KEY`).
 
 Testnet STT: [faucet](https://testnet.somnia.network/). Trading collateral is the venue token (6 decimals on testnet).
 

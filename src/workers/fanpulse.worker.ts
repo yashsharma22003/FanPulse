@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { SettlementService } from '../rewards/settlement.service';
 import { AgentsService } from '../agents/agents.service';
+import { FanNftService } from '../nft/fan-nft.service';
 
 @Injectable()
 export class FanPulseWorker {
@@ -11,6 +12,7 @@ export class FanPulseWorker {
   constructor(
     private readonly settlement: SettlementService,
     private readonly agents: AgentsService,
+    private readonly fanNft: FanNftService,
   ) {}
 
   @Cron('*/15 * * * * *')
@@ -21,6 +23,9 @@ export class FanPulseWorker {
       await this.settlement.expireOpenPredictions();
       await this.settlement.resolveLockedChallenges();
       await this.agents.pollPending();
+      void this.fanNft.syncPending().catch((err: unknown) => {
+        this.logger.warn(`FanNFT sync: ${(err as Error).message}`);
+      });
     } catch (err) {
       this.logger.error((err as Error).message);
     } finally {

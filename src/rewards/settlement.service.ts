@@ -136,6 +136,7 @@ export class SettlementService {
           challengeEnergy: { increment: energy },
           challengeRating: deltas.winnerAfter,
           wins: { increment: 1 },
+          fanNftSyncPending: true,
         },
       });
       await tx.user.update({
@@ -143,6 +144,7 @@ export class SettlementService {
         data: {
           challengeRating: deltas.loserAfter,
           losses: { increment: 1 },
+          fanNftSyncPending: true,
         },
       });
       await tx.ratingEvent.createMany({

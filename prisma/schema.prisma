@@ -40,6 +40,10 @@ model User {
   challengeRating Int      @default(1000)
   wins            Int      @default(0)
   losses          Int      @default(0)
+  fanNftTier         Int?     // last on-chain tier 0-4; null = never minted
+  fanNftTokenId      Int?
+  fanNftTxHash       String?
+  fanNftSyncPending  Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

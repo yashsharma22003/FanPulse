@@ -3,8 +3,8 @@ export const configuration = () => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   jwtSecret: process.env.JWT_SECRET ?? 'change-me-in-production',
   databaseUrl: process.env.DATABASE_URL,
-  siweDomain: process.env.SIWE_DOMAIN ?? 'localhost:3000',
-  siweUri: process.env.SIWE_URI ?? 'http://localhost:3000',
+  siweDomain: process.env.SIWE_DOMAIN ?? 'localhost:5173',
+  siweUri: process.env.SIWE_URI ?? 'http://localhost:5173',
   chainId: parseInt(process.env.CHAIN_ID ?? '50312', 10),
   rpcUrl: process.env.RPC_URL ?? 'https://api.infra.testnet.somnia.network',
   rpcUrlFallback:
@@ -22,6 +22,11 @@ export const configuration = () => ({
   llmAgentId: process.env.SOMNIA_LLM_AGENT_ID || undefined,
   agentsPrivateKey: process.env.AGENTS_PRIVATE_KEY || undefined,
   agentsCallbackAddress: process.env.AGENTS_CALLBACK_ADDRESS || undefined,
+  fanNftAddress: process.env.FAN_NFT_ADDRESS || undefined,
+  fanNftPrivateKey:
+    process.env.FAN_NFT_PRIVATE_KEY ||
+    process.env.AGENTS_PRIVATE_KEY ||
+    undefined,
   challengeWindowMs: parseInt(process.env.CHALLENGE_WINDOW_MS ?? '180000', 10),
   minTradingHeadroomSec: parseInt(
     process.env.MIN_TRADING_HEADROOM_SEC ?? '60',

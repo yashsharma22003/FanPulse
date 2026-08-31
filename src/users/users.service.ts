@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { FanNftService } from '../nft/fan-nft.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly fanNft: FanNftService,
+  ) {}
 
   async profile(wallet: string) {
     const user = await this.prisma.user.findUnique({
@@ -40,6 +44,9 @@ export class UsersService {
       };
     });
 
+    const fanNft = this.fanNft.profileFanNft(user);
+    const tokenURI = await this.fanNft.tokenURI(user.fanNftTokenId);
+
     return {
       wallet: user.wallet,
       challengeEnergy: user.challengeEnergy.toString(),
@@ -47,6 +54,10 @@ export class UsersService {
       wins: user.wins,
       losses: user.losses,
       history,
+      fanNft: {
+        ...fanNft,
+        tokenURI,
+      },
     };
   }
 }

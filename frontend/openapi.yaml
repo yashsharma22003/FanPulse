@@ -1,0 +1,525 @@
+openapi: 3.1.0
+info:
+  title: FanPulse
+  version: 0.1.0
+  description: FanPulse prediction arena API contract
+servers:
+  - url: /api
+    description: Vite proxy prefix to the Nest API
+tags:
+  - name: health
+  - name: auth
+  - name: markets
+  - name: predictions
+  - name: challenges
+  - name: users
+  - name: leaderboard
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /auth/nonce:
+    post:
+      operationId: getAuthNonce
+      tags: [auth]
+      summary: Create a SIWE nonce
+      responses:
+        "200":
+          description: Nonce payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthNonce"
+  /auth/login:
+    post:
+      operationId: loginWithSiwe
+      tags: [auth]
+      summary: Exchange a signed SIWE message for a JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SiweLoginInput"
+      responses:
+        "200":
+          description: Authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthLoginResponse"
+  /markets:
+    get:
+      operationId: listMarkets
+      tags: [markets]
+      summary: List current markets
+      responses:
+        "200":
+          description: Current market windows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Market"
+  /markets/{marketId}:
+    get:
+      operationId: getMarket
+      tags: [markets]
+      summary: Get market detail
+      parameters:
+        - $ref: "#/components/parameters/MarketId"
+      responses:
+        "200":
+          description: Market detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketDetail"
+  /predictions:
+    post:
+      operationId: createPrediction
+      tags: [predictions]
+      summary: Prepare an on-chain prediction order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PredictionInput"
+      responses:
+        "201":
+          description: Prepared prediction and unsigned order transactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreparedPrediction"
+  /predictions/open:
+    get:
+      operationId: listOpenPredictions
+      tags: [predictions]
+      summary: List challengeable predictions
+      responses:
+        "200":
+          description: Open predictions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenPrediction"
+  /predictions/{predictionId}/confirm:
+    post:
+      operationId: confirmPrediction
+      tags: [predictions]
+      summary: Confirm a broadcast prediction order
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PredictionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TxConfirmInput"
+      responses:
+        "200":
+          description: Confirmed prediction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictionConfirmation"
+  /predictions/{predictionId}/challenge:
+    post:
+      operationId: createChallenge
+      tags: [predictions]
+      summary: Prepare an opposite-direction challenge order
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PredictionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChallengeInput"
+      responses:
+        "201":
+          description: Prepared challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreparedChallenge"
+  /challenges/{challengeId}:
+    get:
+      operationId: getChallenge
+      tags: [challenges]
+      summary: Read challenge settlement state
+      parameters:
+        - $ref: "#/components/parameters/ChallengeId"
+      responses:
+        "200":
+          description: Challenge state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Challenge"
+  /challenges/{originalPredictionId}/confirm:
+    post:
+      operationId: confirmChallenge
+      tags: [challenges]
+      summary: Confirm the challenger order using the original prediction id
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OriginalPredictionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TxConfirmInput"
+      responses:
+        "200":
+          description: Locked prediction and challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictionConfirmation"
+  /users/{wallet}:
+    get:
+      operationId: getUserProfile
+      tags: [users]
+      summary: Read a wallet profile
+      parameters:
+        - $ref: "#/components/parameters/Wallet"
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+  /leaderboard:
+    get:
+      operationId: getLeaderboard
+      tags: [leaderboard]
+      summary: Read the public leaderboard
+      parameters:
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [energy, rating]
+            default: energy
+      responses:
+        "200":
+          description: Ranked players
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    MarketId:
+      name: marketId
+      in: path
+      required: true
+      schema:
+        type: string
+    PredictionId:
+      name: predictionId
+      in: path
+      required: true
+      schema:
+        type: string
+    OriginalPredictionId:
+      name: originalPredictionId
+      in: path
+      required: true
+      schema:
+        type: string
+    ChallengeId:
+      name: challengeId
+      in: path
+      required: true
+      schema:
+        type: string
+    Wallet:
+      name: wallet
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+    AuthNonce:
+      type: object
+      properties:
+        nonce: { type: string }
+        domain: { type: string }
+        uri: { type: string }
+        chainId: { type: number }
+        expiresAt: { type: string, format: date-time }
+      required: [nonce, domain, uri, chainId, expiresAt]
+    SiweLoginInput:
+      type: object
+      properties:
+        message: { type: string }
+        signature: { type: string }
+      required: [message, signature]
+    AuthLoginResponse:
+      type: object
+      properties:
+        token: { type: string }
+        user:
+          $ref: "#/components/schemas/User"
+      required: [token, user]
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        wallet: { type: string }
+        challengeEnergy: { type: number }
+        challengeRating: { type: number }
+        wins: { type: number }
+        losses: { type: number }
+        fanNft:
+          $ref: "#/components/schemas/FanNft"
+      required: [id, wallet, challengeEnergy, challengeRating, wins, losses]
+    FanNft:
+      type: object
+      properties:
+        tier: { type: string, enum: [ROOKIE, SCOUT, ANALYST, EXPERT, ORACLE] }
+        progress: { type: number }
+        nextTier: { type: ["string", "null"] }
+        lastUpdateTxHash: { type: ["string", "null"] }
+      required: [tier, progress, nextTier, lastUpdateTxHash]
+    Market:
+      type: object
+      properties:
+        id: { type: string }
+        marketId: { type: string }
+        asset: { type: string }
+        intervalSec: { type: number }
+        tradingStart: { type: ["string", "null"], format: date-time }
+        expiry: { type: string, format: date-time }
+        pool: { type: ["string", "null"] }
+        venueId: { type: ["string", "null"] }
+        onchainStatus: { type: number }
+        aiPercent: { type: ["number", "null"] }
+        aiStatus: { type: string, enum: [IDLE, PENDING, READY, FAILED] }
+        secondsLeft: { type: number }
+        tradable: { type: boolean }
+      required: [id, marketId, asset, intervalSec, tradingStart, expiry, pool, venueId, onchainStatus, aiPercent, aiStatus, secondsLeft, tradable]
+    MarketDetail:
+      allOf:
+        - $ref: "#/components/schemas/Market"
+        - type: object
+          properties:
+            isResolved: { type: boolean }
+            isVoided: { type: boolean }
+            winningOutcome: { type: ["number", "null"], enum: [0, 1, null] }
+            odds:
+              $ref: "#/components/schemas/Odds"
+            communityPercent: { type: ["number", "null"] }
+            userPercent: { type: ["number", "null"] }
+            openingPrice: { type: ["string", "null"] }
+            question: { type: ["string", "null"] }
+          required: [isResolved, isVoided, winningOutcome, odds, communityPercent, userPercent, openingPrice, question]
+    Odds:
+      type: object
+      properties:
+        pUp: { type: ["number", "null"] }
+        bestBid: { type: ["number", "null"] }
+        bestAsk: { type: ["number", "null"] }
+      required: [pUp, bestBid, bestAsk]
+    UnsignedTx:
+      type: object
+      properties:
+        to: { type: string }
+        data: { type: string }
+        value: { type: string }
+        chainId: { type: number }
+        description: { type: string }
+      required: [to, data, value, chainId, description]
+    PredictionInput:
+      type: object
+      properties:
+        marketId: { type: string }
+        direction: { type: string, enum: [UP, DOWN] }
+        confidence: { type: number, minimum: 1, maximum: 99 }
+        quantity: { type: number, minimum: 0 }
+      required: [marketId, direction, confidence]
+    ChallengeInput:
+      type: object
+      properties:
+        direction: { type: string, enum: [UP, DOWN] }
+        confidence: { type: number, minimum: 1, maximum: 99 }
+        quantity: { type: number, minimum: 0 }
+      required: [direction, confidence]
+    TxConfirmInput:
+      type: object
+      properties:
+        txHash: { type: string }
+      required: [txHash]
+    Prediction:
+      type: object
+      properties:
+        id: { type: string }
+        marketId: { type: string }
+        wallet: { type: string }
+        direction: { type: string, enum: [UP, DOWN] }
+        confidence: { type: number }
+        quantityFilled: { type: number }
+        status: { type: string, enum: [PENDING, OPEN, LOCKED, EXPIRED] }
+        challengeExpiresAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, marketId, wallet, direction, confidence, quantityFilled, status, challengeExpiresAt, createdAt]
+    PreparedPrediction:
+      type: object
+      properties:
+        prediction: { $ref: "#/components/schemas/Prediction" }
+        order: { $ref: "#/components/schemas/PreparedOrder" }
+      required: [prediction, order]
+    PreparedChallenge:
+      type: object
+      properties:
+        prediction: { $ref: "#/components/schemas/Prediction" }
+        originalPredictionId: { type: string }
+        order: { $ref: "#/components/schemas/PreparedOrder" }
+      required: [prediction, originalPredictionId, order]
+    PreparedOrder:
+      type: object
+      properties:
+        marketId: { type: string }
+        pool: { type: string }
+        collateral: { type: string }
+        side: { type: string }
+        kind: { type: string }
+        direction: { type: string, enum: [UP, DOWN] }
+        quantityHuman: { type: number }
+        priceHuman: { type: number }
+        decimals: { type: number }
+        approval: { $ref: "#/components/schemas/UnsignedTx" }
+        order: { $ref: "#/components/schemas/UnsignedTx" }
+      required: [marketId, pool, collateral, side, kind, direction, quantityHuman, priceHuman, decimals, approval, order]
+    PredictionConfirmation:
+      type: object
+      properties:
+        prediction: { $ref: "#/components/schemas/Prediction" }
+        challenge: { $ref: "#/components/schemas/Challenge" }
+      required: [prediction]
+    OpenPrediction:
+      type: object
+      properties:
+        id: { type: string }
+        direction: { type: string, enum: [UP, DOWN] }
+        confidence: { type: number }
+        quantityFilled: { type: number }
+        challengeExpiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        predictor:
+          type: object
+          properties:
+            wallet: { type: string }
+            challengeRating: { type: number }
+            fanNft: { $ref: "#/components/schemas/FanNft" }
+          required: [wallet, challengeRating]
+        market:
+          type: object
+          properties:
+            marketId: { type: string }
+            asset: { type: string }
+            intervalSec: { type: number }
+          required: [marketId, asset, intervalSec]
+      required: [id, direction, confidence, quantityFilled, challengeExpiresAt, createdAt, predictor, market]
+    Challenge:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [LOCKED, RESOLVED, VOIDED, EXPIRED] }
+        multiplier: { type: ["number", "null"] }
+        energyPaid: { type: ["number", "null"] }
+        resolvedAt: { type: ["string", "null"], format: date-time }
+        winnerWallet: { type: ["string", "null"] }
+        market:
+          type: object
+          properties:
+            marketId: { type: string }
+            asset: { type: string }
+          required: [marketId, asset]
+        original:
+          $ref: "#/components/schemas/ChallengeSide"
+        challenger:
+          $ref: "#/components/schemas/ChallengeSide"
+      required: [id, status, multiplier, energyPaid, resolvedAt, winnerWallet, market, original, challenger]
+    ChallengeSide:
+      type: object
+      properties:
+        id: { type: string }
+        wallet: { type: string }
+        direction: { type: string, enum: [UP, DOWN] }
+        confidence: { type: number }
+        quantityFilled: { type: number }
+      required: [id, wallet, direction, confidence, quantityFilled]
+    UserProfile:
+      type: object
+      properties:
+        wallet: { type: string }
+        challengeEnergy: { type: number }
+        challengeRating: { type: number }
+        wins: { type: number }
+        losses: { type: number }
+        fanNft: { $ref: "#/components/schemas/FanNft" }
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoryEntry"
+      required: [wallet, challengeEnergy, challengeRating, wins, losses, fanNft, history]
+    HistoryEntry:
+      type: object
+      properties:
+        id: { type: string }
+        asset: { type: string }
+        direction: { type: string, enum: [UP, DOWN] }
+        result: { type: string, enum: [WIN, LOSS, VOID, OPEN] }
+        energy: { type: number }
+        createdAt: { type: string, format: date-time }
+      required: [id, asset, direction, result, energy, createdAt]
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank: { type: number }
+        wallet: { type: string }
+        challengeEnergy: { type: number }
+        challengeRating: { type: number }
+        wins: { type: number }
+        losses: { type: number }
+        fanNft: { $ref: "#/components/schemas/FanNft" }
+      required: [rank, wallet, challengeEnergy, challengeRating, wins, losses]
