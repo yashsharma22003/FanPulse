@@ -78,6 +78,11 @@ export class PredictionsService {
     if (prediction.userId !== user.userId) {
       throw new ForbiddenException('Not your prediction');
     }
+    if (prediction.battleId) {
+      throw new BadRequestException(
+        'Use POST /battles/entries/:predictionId/confirm for battle entries',
+      );
+    }
     if (prediction.status !== PredictionStatus.PENDING) {
       throw new BadRequestException('Prediction is not pending confirmation');
     }
@@ -124,6 +129,8 @@ export class PredictionsService {
         status: PredictionStatus.OPEN,
         challengeExpiresAt: { gt: now },
         originalChallenge: null,
+        battleId: null,
+        battleEntry: null,
       },
       include: { user: true, market: true },
       orderBy: { createdAt: 'desc' },

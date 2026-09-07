@@ -5,11 +5,13 @@ import { PrismaService } from '../prisma/prisma.service';
 export class LeaderboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(sort: 'energy' | 'rating' = 'energy') {
+  async list(sort: 'energy' | 'rating' | 'battlesWon' = 'energy') {
     const orderBy =
       sort === 'rating'
         ? { challengeRating: 'desc' as const }
-        : { challengeEnergy: 'desc' as const };
+        : sort === 'battlesWon'
+          ? { battlesWon: 'desc' as const }
+          : { challengeEnergy: 'desc' as const };
     const users = await this.prisma.user.findMany({
       orderBy,
       take: 100,
@@ -19,6 +21,7 @@ export class LeaderboardService {
         challengeRating: true,
         wins: true,
         losses: true,
+        battlesWon: true,
       },
     });
     return users.map((u, i) => ({
@@ -28,6 +31,7 @@ export class LeaderboardService {
       challengeRating: u.challengeRating,
       wins: u.wins,
       losses: u.losses,
+      battlesWon: u.battlesWon,
     }));
   }
 }

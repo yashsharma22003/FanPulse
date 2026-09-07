@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { SettlementService } from '../rewards/settlement.service';
+import { BattleSettlementService } from '../battles/battle-settlement.service';
 import { AgentsService } from '../agents/agents.service';
 import { FanNftService } from '../nft/fan-nft.service';
 
@@ -11,6 +12,7 @@ export class FanPulseWorker {
 
   constructor(
     private readonly settlement: SettlementService,
+    private readonly battleSettlement: BattleSettlementService,
     private readonly agents: AgentsService,
     private readonly fanNft: FanNftService,
   ) {}
@@ -21,6 +23,8 @@ export class FanPulseWorker {
     this.running = true;
     try {
       await this.settlement.expireOpenPredictions();
+      await this.battleSettlement.lockOpenBattles();
+      await this.battleSettlement.resolveLockedBattles();
       await this.settlement.resolveLockedChallenges();
       await this.agents.pollPending();
       void this.fanNft.syncPending().catch((err: unknown) => {

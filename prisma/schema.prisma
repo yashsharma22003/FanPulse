@@ -26,6 +26,13 @@ enum ChallengeStatus {
   EXPIRED
 }
 
+enum BattleStatus {
+  OPEN
+  LOCKED
+  RESOLVED
+  VOIDED
+}
+
 enum AiStatus {
   IDLE
   PENDING
@@ -44,12 +51,15 @@ model User {
   fanNftTokenId      Int?
   fanNftTxHash       String?
   fanNftSyncPending  Boolean  @default(false)
+  battlesWon         Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  predictions   Prediction[]
-  challengesWon Challenge[]  @relation("ChallengeWinner")
-  ratingEvents  RatingEvent[]
+  predictions        Prediction[]
+  challengesWon      Challenge[]         @relation("ChallengeWinner")
+  ratingEvents       RatingEvent[]
+  battleEntries      BattleEntry[]
+  battleRatingEvents BattleRatingEvent[]
 }
 
 model Market {
@@ -71,6 +81,7 @@ model Market {
   updatedAt     DateTime @updatedAt
 
   predictions Prediction[]
+  battle      Battle?
 }
 
 model Prediction {
@@ -90,13 +101,16 @@ model Prediction {
   status             PredictionStatus @default(PENDING)
   challengeExpiresAt DateTime?
   challengingOfId    String?
+  battleId           String?
   challengingOf      Prediction?      @relation("ChallengeAttempt", fields: [challengingOfId], references: [id])
   challengeAttempts  Prediction[]     @relation("ChallengeAttempt")
+  battle             Battle?          @relation("BattlePredictions", fields: [battleId], references: [id])
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
   originalChallenge    Challenge? @relation("OriginalPrediction")
   challengerChallenge  Challenge? @relation("ChallengerPrediction")
+  battleEntry          BattleEntry?
 
   @@index([status, challengeExpiresAt])
   @@index([marketRowId, status])
@@ -141,4 +155,56 @@ model AuthNonce {
   expiresAt DateTime
 
   @@index([expiresAt])
+}
+
+model Battle {
+  id               String        @id @default(cuid())
+  marketRowId      String        @unique
+  market           Market        @relation(fields: [marketRowId], references: [id])
+  status           BattleStatus  @default(OPEN)
+  locksAt          DateTime
+  winningDirection Direction?
+  voidReason       String?
+  resolvedAt       DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  entries            BattleEntry[]
+  ratingEvents       BattleRatingEvent[]
+  pendingPredictions Prediction[]      @relation("BattlePredictions")
+
+  @@index([status])
+  @@index([locksAt])
+}
+
+model BattleEntry {
+  id           String     @id @default(cuid())
+  battleId     String
+  battle       Battle     @relation(fields: [battleId], references: [id])
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  predictionId String     @unique
+  prediction   Prediction @relation(fields: [predictionId], references: [id])
+  placement    Int?
+  energyPaid   Decimal    @default(0) @db.Decimal(18, 8)
+  multiplier   Decimal    @default(1) @db.Decimal(8, 4)
+  createdAt    DateTime   @default(now())
+
+  @@unique([battleId, userId])
+  @@index([battleId])
+}
+
+model BattleRatingEvent {
+  id           String   @id @default(cuid())
+  battleId     String
+  battle       Battle   @relation(fields: [battleId], references: [id])
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  ratingBefore Int
+  ratingAfter  Int
+  input        Json
+  createdAt    DateTime @default(now())
+
+  @@index([battleId])
+  @@index([userId])
 }

@@ -32,6 +32,7 @@ export const configuration = () => ({
     process.env.MIN_TRADING_HEADROOM_SEC ?? '60',
     10,
   ),
+  battleMinEntrants: parseInt(process.env.BATTLE_MIN_ENTRANTS ?? '2', 10),
 });
 
 export type AppConfig = ReturnType<typeof configuration>;

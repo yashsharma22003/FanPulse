@@ -9,7 +9,12 @@ export class LeaderboardController {
 
   @Get()
   list(@Query('sort') sort?: string) {
-    const key = sort === 'rating' ? 'rating' : 'energy';
+    const key =
+      sort === 'rating'
+        ? 'rating'
+        : sort === 'battlesWon'
+          ? 'battlesWon'
+          : 'energy';
     return this.leaderboard.list(key);
   }
 }

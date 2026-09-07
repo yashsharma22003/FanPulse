@@ -18,6 +18,14 @@ export class UsersService {
           orderBy: { createdAt: 'desc' },
           take: 50,
         },
+        battleEntries: {
+          include: {
+            battle: { include: { market: true } },
+            prediction: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        },
       },
     });
     if (!user) throw new NotFoundException('User not found');
@@ -47,13 +55,29 @@ export class UsersService {
     const fanNft = this.fanNft.profileFanNft(user);
     const tokenURI = await this.fanNft.tokenURI(user.fanNftTokenId);
 
+    const battleHistory = user.battleEntries.map((e) => ({
+      battleId: e.battleId,
+      marketId: e.battle.market.marketId,
+      asset: e.battle.market.asset,
+      battleStatus: e.battle.status,
+      direction: e.prediction.direction,
+      confidence: Number(e.prediction.confidence),
+      placement: e.placement,
+      energyPaid: e.energyPaid.toString(),
+      winningDirection: e.battle.winningDirection,
+      resolvedAt: e.battle.resolvedAt?.toISOString() ?? null,
+      createdAt: e.createdAt.toISOString(),
+    }));
+
     return {
       wallet: user.wallet,
       challengeEnergy: user.challengeEnergy.toString(),
       challengeRating: user.challengeRating,
       wins: user.wins,
       losses: user.losses,
+      battlesWon: user.battlesWon,
       history,
+      battleHistory,
       fanNft: {
         ...fanNft,
         tokenURI,

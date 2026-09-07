@@ -13,6 +13,7 @@ import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { AgentsModule } from './agents/agents.module';
 import { WorkersModule } from './workers/workers.module';
+import { BattlesModule } from './battles/battles.module';
 import { configuration } from './config/configuration';
 
 @Module({
@@ -37,6 +38,7 @@ import { configuration } from './config/configuration';
     LeaderboardModule,
     RewardsModule,
     AgentsModule,
+    BattlesModule,
     WorkersModule,
   ],
 })

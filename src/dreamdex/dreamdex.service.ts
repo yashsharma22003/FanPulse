@@ -474,7 +474,7 @@ export class DreamdexService implements OnModuleInit, OnModuleDestroy {
       quantityFilled: this.toHuman(filled, decimals).toString(),
       txHash: opts.txHash,
       kind,
-    };
+    }; 
   }
 
   kindForDirection(direction: 'UP' | 'DOWN'): number {
