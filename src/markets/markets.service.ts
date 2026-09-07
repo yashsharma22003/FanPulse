@@ -94,6 +94,13 @@ export class MarketsService {
       opening = null;
     }
 
+    const minHeadroom = this.config.getOrThrow<number>('minTradingHeadroomSec');
+    const tradable =
+      this.dreamdex.isTradingOnchain(onchain.status) &&
+      secondsLeft >= minHeadroom &&
+      !onchain.isResolved &&
+      !onchain.isVoided;
+
     return {
       ...this.serialize(row),
       onchainStatus: onchain.status,
@@ -102,8 +109,9 @@ export class MarketsService {
       winningOutcome: onchain.isResolved ? onchain.winningOutcome : null,
       pool: onchain.pool,
       secondsLeft,
+      tradable,
       odds: {
-        pUp: mid,
+        pUp: mid == null ? null : Math.round(mid * 1000) / 10,
         bestBid: book.yesBids[0]
           ? this.dreamdex.rawToHuman(book.yesBids[0].price, decimals)
           : null,

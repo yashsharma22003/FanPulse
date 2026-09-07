@@ -3,14 +3,15 @@ import {
   Controller,
   Delete,
   Get,
-  NotFoundException,
   Param,
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { BattleStatus } from '@prisma/client';
+import type { Response } from 'express';
 import { BattlesService } from './battles.service';
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator';
 import { Public } from '../auth/public.decorator';
@@ -49,13 +50,18 @@ export class BattlesController {
   async getByMarket(
     @Param('marketId') marketId: string,
     @Req() req: { user?: AuthUser },
+    @Res({ passthrough: true }) res: Response,
   ) {
-    try {
-      return await this.battles.getByMarketId(marketId, req.user?.wallet);
-    } catch (err) {
-      if (err instanceof NotFoundException) throw err;
-      throw err;
+    // No battle yet is normal. Nest drops `null` bodies — send explicit JSON null.
+    const battle = await this.battles.getByMarketId(
+      marketId,
+      req.user?.wallet,
+    );
+    if (battle === null) {
+      res.status(200).type('json').send('null');
+      return;
     }
+    return battle;
   }
 
   @Post('battles/:marketId/enter')

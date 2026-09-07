@@ -99,15 +99,90 @@ function shortWallet(wallet?: string) {
   if (!wallet) return '—';
   return wallet.length > 11 ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : wallet;
 }
+
 function formatTime(seconds = 0) {
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
-  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+  const s = Math.max(0, Math.floor(seconds));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
+  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
 }
+
 function formatDate(date?: string | null) {
   return date ? new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—';
 }
-function tierLabel(tier?: string) { return tier ? tier.charAt(0) + tier.slice(1).toLowerCase() : 'Rookie'; }
+
+function tierLabel(tier?: string) {
+  return tier ? tier.charAt(0) + tier.slice(1).toLowerCase() : 'Rookie';
+}
+
+/** DreamDEX mid/odds arrive as 0–1; aiPercent is already 0–100 when set. */
+function asPercentPoints(value: number | string | null | undefined): number | null {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return n <= 1 ? n * 100 : n;
+}
+
+function formatPercent(
+  value: number | string | null | undefined,
+  fallback = '—',
+): string {
+  const pts = asPercentPoints(value);
+  return pts == null ? fallback : `${Math.round(pts)}%`;
+}
+
+function formatInterval(intervalSec?: number) {
+  if (!intervalSec || intervalSec <= 0) return 'window';
+  if (intervalSec >= 86400) {
+    const d = intervalSec / 86400;
+    return `${d % 1 === 0 ? d : d.toFixed(1)} day`;
+  }
+  if (intervalSec >= 3600) {
+    const h = intervalSec / 3600;
+    return `${h % 1 === 0 ? h : h.toFixed(1)} hour`;
+  }
+  return `${Math.max(1, Math.round(intervalSec / 60))} min`;
+}
+
+/** `pool` from API is a contract address — never treat hex as a dollar amount. */
+function formatPoolLabel(pool?: string | number | null) {
+  if (pool == null || pool === '') return null;
+  const raw = String(pool);
+  if (raw.startsWith('0x')) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+function formatVenue(venueId?: string | null) {
+  if (!venueId) return 'Somnia';
+  if (venueId.startsWith('0x')) return 'Somnia venue';
+  return venueId.length > 18 ? `${venueId.slice(0, 12)}…` : venueId;
+}
+
+function formatQuestion(question?: string | null, asset?: string) {
+  if (!question) return `Will ${asset ?? 'this market'} close higher than it opened?`;
+  const q = question.trim();
+  // Collapse verbose pricefeed test prompts into a readable line.
+  const m = q.match(
+    /will\s+([A-Za-z0-9./_-]+)(?:'s)?\s+.*?(?:at or above|above|below)\s+([\d.]+)/i,
+  );
+  if (m) {
+    return `Will ${m[1]} finish at or above ${Number(m[2]).toLocaleString(undefined, { maximumFractionDigits: 2 })}?`;
+  }
+  return q.length > 140 ? `${q.slice(0, 137)}…` : q;
+}
+
+function formatOpeningPrice(price?: string | number | null) {
+  if (price == null || price === '' || price === '—') return '—';
+  const n = Number(price);
+  if (!Number.isFinite(n)) {
+    const s = String(price);
+    return s.length > 14 ? `${s.slice(0, 12)}…` : s;
+  }
+  if (Math.abs(n) >= 1e12) return n.toExponential(2);
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
 
 function Logo() {
   return <Link href="/" className="flex items-center gap-3" data-testid="link-logo">
@@ -221,13 +296,62 @@ function PageIntro({ eyebrow, title, children }: { eyebrow: string; title: React
 }
 
 function MarketCard({ market, index = 0, battleEntrants }: { market: any; index?: number; battleEntrants?: number }) {
-  const up = (market.aiPercent ?? 50) >= 50;
-  return <Link href={`/market/${market.marketId}`} className="group rise block rounded-[22px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-1 hover:shadow-[var(--shadow-lg)]" style={{ animationDelay: `${index * 70}ms` }} data-testid={`card-market-${market.marketId}`}>
-    <div className="mb-7 flex items-start justify-between"><div><div className="flex flex-wrap items-center gap-2"><span className="font-display text-lg font-bold">{market.asset}</span><StatusPill tone={market.tradable ? 'lime' : 'muted'}>{market.tradable ? 'Live' : 'Locked'}</StatusPill>{battleEntrants != null && battleEntrants > 0 ? <StatusPill tone="coral"><Users size={10} />BR · {battleEntrants}</StatusPill> : market.tradable ? <StatusPill tone="muted">BR open</StatusPill> : null}</div><p className="mt-1 font-mono-ui text-[10px] uppercase tracking-[.13em] text-[hsl(var(--muted-foreground))]">{market.intervalSec / 60 >= 60 ? `${market.intervalSec / 3600} hour` : `${market.intervalSec / 60} min`} call · {market.venueId ?? 'Somnia venue'}</p></div><ChevronRight size={18} className="text-[hsl(var(--muted-foreground))] transition-transform group-hover:translate-x-1" /></div>
-    <div className="mb-5 flex items-end justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))]">AI consensus</p><p className="mt-1 font-display text-4xl font-bold">{market.aiPercent ?? '—'}<span className="text-2xl text-[hsl(var(--muted-foreground))]">%</span></p></div><Sparkline hot={up} /></div>
-    <div className="mb-4 h-2 overflow-hidden rounded-full bg-[hsl(var(--muted))]"><div className="h-full rounded-full bg-[hsl(var(--accent))] transition-all" style={{ width: `${market.aiPercent ?? 50}%` }} /></div>
-    <div className="flex items-center justify-between border-t border-[hsl(var(--border))] pt-4 text-xs"><span className="flex items-center gap-1.5 text-[hsl(var(--muted-foreground))]"><Clock3 size={13} />Locks in <strong className="font-mono-ui text-[hsl(var(--foreground))]">{formatTime(market.secondsLeft)}</strong></span><span className="font-mono-ui font-bold text-[hsl(var(--muted-foreground))]">${Number(market.pool ?? 0).toLocaleString()} pool</span></div>
-  </Link>;
+  const aiPts = asPercentPoints(market.aiPercent);
+  const up = (aiPts ?? 50) >= 50;
+  const poolLabel = formatPoolLabel(market.pool);
+  return (
+    <Link
+      href={`/market/${market.marketId}`}
+      className="group rise flex min-w-0 flex-col overflow-hidden rounded-[22px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-1 hover:shadow-[var(--shadow-lg)]"
+      style={{ animationDelay: `${index * 70}ms` }}
+      data-testid={`card-market-${market.marketId}`}
+    >
+      <div className="mb-6 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate font-display text-lg font-bold">{market.asset}</span>
+            <StatusPill tone={market.tradable ? 'lime' : 'muted'}>{market.tradable ? 'Live' : 'Locked'}</StatusPill>
+            {battleEntrants != null && battleEntrants > 0 ? (
+              <StatusPill tone="coral">
+                <Users size={10} />
+                BR · {battleEntrants}
+              </StatusPill>
+            ) : market.tradable ? (
+              <StatusPill tone="muted">BR open</StatusPill>
+            ) : null}
+          </div>
+          <p className="mt-1 truncate font-mono-ui text-[10px] uppercase tracking-[.13em] text-[hsl(var(--muted-foreground))]">
+            {formatInterval(market.intervalSec)} call · {formatVenue(market.venueId)}
+          </p>
+        </div>
+        <ChevronRight size={18} className="mt-1 shrink-0 text-[hsl(var(--muted-foreground))] transition-transform group-hover:translate-x-1" />
+      </div>
+      <div className="mb-5 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono-ui text-[10px] uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))]">{aiPts == null ? "No read yet" : "AI consensus"}</p>
+          <p className="mt-1 font-display text-4xl font-bold tabular-nums">
+            {aiPts == null ? '—' : Math.round(aiPts)}
+            {aiPts != null ? <span className="text-2xl text-[hsl(var(--muted-foreground))]">%</span> : null}
+          </p>
+        </div>
+        <Sparkline hot={up} />
+      </div>
+      <div className="mb-4 h-2 overflow-hidden rounded-full bg-[hsl(var(--muted))]">
+        <div className="h-full rounded-full bg-[hsl(var(--accent))] transition-all" style={{ width: `${aiPts ?? 50}%` }} />
+      </div>
+      <div className="mt-auto flex items-center justify-between gap-3 border-t border-[hsl(var(--border))] pt-4 text-xs">
+        <span className="flex min-w-0 items-center gap-1.5 text-[hsl(var(--muted-foreground))]">
+          <Clock3 size={13} className="shrink-0" />
+          Locks in <strong className="font-mono-ui text-[hsl(var(--foreground))]">{formatTime(market.secondsLeft)}</strong>
+        </span>
+        {poolLabel ? (
+          <span className="shrink-0 font-mono-ui font-bold text-[hsl(var(--muted-foreground))]">{poolLabel}</span>
+        ) : (
+          <span className="shrink-0 font-mono-ui text-[10px] uppercase tracking-[.08em] text-[hsl(var(--muted-foreground))]">On-chain</span>
+        )}
+      </div>
+    </Link>
+  );
 }
 
 function ConnectionState({ error, onRetry }: { error?: boolean; onRetry?: () => void }) {
@@ -237,11 +361,13 @@ function ConnectionState({ error, onRetry }: { error?: boolean; onRetry?: () => 
 function Home() {
   const query = useListMarkets({ query: { queryKey: getListMarketsQueryKey(), staleTime: 30000, retry: false } });
   const battlesQuery = useListBattles({ status: 'OPEN', limit: 6 }, { query: { staleTime: 10000, refetchInterval: 15000, retry: false } });
-  const markets = query.data ?? fallbackMarkets;
+  // Only use preview markets when the API truly failed — never while loading
+  // (that briefly linked featured CTA to fake id somnia-eth-15m).
+  const markets = query.data ?? (query.isError ? fallbackMarkets : []);
   const featured = markets[0];
   const openBattles = battlesQuery.data ?? [];
   const battleByMarket = useMemo(() => new Map(openBattles.map((b) => [b.marketId, b.entrantCount])), [openBattles]);
-  return <AppShell><div className="arena-grid px-5 py-8 sm:px-8 sm:py-10 lg:px-10"><div className="mx-auto max-w-[1280px]"><PageIntro eyebrow="Live from Somnia Shannon" title={<>Make the call.<br /><span className="text-[hsl(var(--accent))]">Own the moment.</span></> }><Link href="/battles" className="flex items-center gap-2 rounded-xl bg-[hsl(var(--accent)/.15)] px-4 py-2.5 text-xs font-bold text-[hsl(var(--accent))] hover:bg-[hsl(var(--accent)/.25)]" data-testid="link-battle-royale-hub"><Users size={14} /> Battle Royale mode</Link></PageIntro>{query.isError && <ConnectionState error onRetry={() => query.refetch()} />}<section className="mb-12 grid gap-5 lg:grid-cols-[1.55fr_1fr]"><div className="relative overflow-hidden rounded-[28px] bg-[hsl(var(--primary))] p-6 text-[hsl(var(--primary-foreground))] shadow-[var(--shadow-lg)] sm:p-9"><div className="absolute -right-14 -top-20 h-64 w-64 rounded-full border-[38px] border-[hsl(var(--secondary)/.25)]" /><div className="absolute bottom-0 right-12 h-32 w-32 rotate-45 bg-[hsl(var(--accent)/.9)] opacity-90" /><div className="relative z-10 max-w-xl"><div className="mb-12 flex items-center justify-between"><StatusPill tone="lime"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />Featured opportunity</StatusPill><span className="font-mono-ui text-[10px] uppercase tracking-[.15em] opacity-55">01 / 04</span></div><p className="mb-2 font-mono-ui text-[10px] uppercase tracking-[.17em] opacity-55">The crowd is leaning</p><h2 className="font-display text-4xl font-extrabold tracking-[-.06em] sm:text-6xl">{featured.asset}</h2><p className="mt-3 max-w-sm text-sm leading-6 opacity-70">Will the reference price close higher than it opened?</p><div className="mt-10 flex flex-wrap items-end gap-8"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.13em] opacity-55">AI says Up</p><p className="font-display text-5xl font-bold text-[hsl(var(--secondary))]">{featured.aiPercent}%</p></div><div className="h-12 w-px bg-white/20" /><div><p className="font-mono-ui text-[10px] uppercase tracking-[.13em] opacity-55">Time to lock</p><p className="font-mono-ui text-xl font-bold">{formatTime(featured.secondsLeft)}</p></div></div><div className="mt-10 flex flex-wrap gap-3"><Link href={`/market/${featured.marketId}`} className="inline-flex items-center gap-2 rounded-xl bg-[hsl(var(--secondary))] px-5 py-3.5 text-sm font-bold text-[hsl(var(--primary))] transition-transform hover:-translate-y-0.5" data-testid="link-featured-market">Enter market <ArrowUpRight size={16} /></Link><Link href={`/market/${featured.marketId}?mode=battle`} className="inline-flex items-center gap-2 rounded-xl border-2 border-[hsl(var(--accent))] bg-[hsl(var(--accent)/.12)] px-5 py-3.5 text-sm font-bold text-[hsl(var(--primary))] transition-transform hover:-translate-y-0.5" data-testid="link-featured-battle"><Users size={16} /> Join Battle Royale</Link></div></div></div><div className="rounded-[28px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 shadow-[var(--shadow-sm)] sm:p-8"><div className="mb-8 flex items-center justify-between"><p className="font-mono-ui text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Open Battle Royales</p><Flame size={18} className="text-[hsl(var(--accent))]" /></div>{openBattles.length ? <div className="space-y-3">{openBattles.map((b) => <Link key={b.id} href={`/battles/${b.id}`} className="flex items-center justify-between rounded-xl border border-[hsl(var(--border))] px-4 py-3 transition-colors hover:bg-[hsl(var(--muted)/.55)]" data-testid={`link-open-battle-${b.id}`}><div><p className="text-sm font-bold">{b.asset}</p><p className="font-mono-ui text-[9px] uppercase text-[hsl(var(--muted-foreground))]">{b.entrantCount} entrants · {formatTime(b.secondsLeft)} left</p></div><StatusPill tone="coral"><Crown size={10} />Battle Royale</StatusPill></Link>)}</div> : <p className="text-sm text-[hsl(var(--muted-foreground))]">No open battles yet — <Link href="/battles" className="font-bold text-[hsl(var(--accent))]">start one</Link>.</p>}</div></section><div className="mb-5 flex items-end justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Markets in play</p><h2 className="mt-1 font-display text-2xl font-bold tracking-[-.04em]">Pick your pressure point</h2></div><span className="font-mono-ui text-[10px] text-[hsl(var(--muted-foreground))]">{markets.length} LIVE WINDOWS</span></div>{query.isLoading ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div> : markets.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{markets.map((market: any, index: number) => <MarketCard key={market.marketId} market={market} index={index} battleEntrants={battleByMarket.get(market.marketId)} />)}</div> : <div className="rounded-2xl border border-dashed border-[hsl(var(--border))] p-12 text-center" data-testid="empty-markets"><p className="font-display text-xl font-bold">No markets are live right now.</p><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">The arena is between rounds. Check back soon.</p></div>}</div></div></AppShell>;
+  return <AppShell><div className="arena-grid px-5 py-8 sm:px-8 sm:py-10 lg:px-10"><div className="mx-auto max-w-[1280px]"><PageIntro eyebrow="Live from Somnia Shannon" title={<>Make the call.<br /><span className="text-[hsl(var(--accent))]">Own the moment.</span></> }><Link href="/battles" className="flex items-center gap-2 rounded-xl bg-[hsl(var(--accent)/.15)] px-4 py-2.5 text-xs font-bold text-[hsl(var(--accent))] hover:bg-[hsl(var(--accent)/.25)]" data-testid="link-battle-royale-hub"><Users size={14} /> Battle Royale mode</Link></PageIntro>{query.isError && <ConnectionState error onRetry={() => query.refetch()} />}{!featured && query.isLoading ? <ConnectionState /> : null}{featured ? <section className="mb-12 grid gap-5 lg:grid-cols-[1.55fr_1fr]"><div className="relative overflow-hidden rounded-[28px] bg-[hsl(var(--primary))] p-6 text-[hsl(var(--primary-foreground))] shadow-[var(--shadow-lg)] sm:p-9"><div className="absolute -right-14 -top-20 h-64 w-64 rounded-full border-[38px] border-[hsl(var(--secondary)/.25)]" /><div className="pointer-events-none absolute -bottom-6 -right-4 h-28 w-28 rotate-45 bg-[hsl(var(--accent)/.55)]" /><div className="relative z-10 max-w-xl"><div className="mb-12 flex items-center justify-between"><StatusPill tone="lime"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />Featured opportunity</StatusPill><span className="font-mono-ui text-[10px] uppercase tracking-[.15em] opacity-55">01 / 04</span></div><p className="mb-2 font-mono-ui text-[10px] uppercase tracking-[.17em] opacity-55">The crowd is leaning</p><h2 className="font-display text-4xl font-extrabold tracking-[-.06em] sm:text-6xl">{featured.asset}</h2><p className="mt-3 max-w-sm text-sm leading-6 opacity-70">Will the reference price close higher than it opened?</p><div className="mt-10 flex flex-wrap items-end gap-8"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.13em] opacity-55">{asPercentPoints(featured.aiPercent) == null ? "AI standing by" : "AI says Up"}</p><p className="font-display text-5xl font-bold text-[hsl(var(--secondary))]">{formatPercent(featured.aiPercent)}</p></div><div className="h-12 w-px bg-white/20" /><div><p className="font-mono-ui text-[10px] uppercase tracking-[.13em] opacity-55">Time to lock</p><p className="font-mono-ui text-xl font-bold">{formatTime(featured.secondsLeft)}</p></div></div><div className="mt-10 flex flex-wrap gap-3"><Link href={`/market/${featured.marketId}`} className="inline-flex items-center gap-2 rounded-xl bg-[hsl(var(--secondary))] px-5 py-3.5 text-sm font-bold text-[hsl(var(--primary))] transition-transform hover:-translate-y-0.5" data-testid="link-featured-market">Enter market <ArrowUpRight size={16} /></Link><Link href={`/market/${featured.marketId}?mode=battle`} className="inline-flex items-center gap-2 rounded-xl border-2 border-[hsl(var(--accent))] bg-[hsl(var(--accent)/.12)] px-5 py-3.5 text-sm font-bold text-[hsl(var(--primary))] transition-transform hover:-translate-y-0.5" data-testid="link-featured-battle"><Users size={16} /> Join Battle Royale</Link></div></div></div><div className="rounded-[28px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 shadow-[var(--shadow-sm)] sm:p-8"><div className="mb-8 flex items-center justify-between"><p className="font-mono-ui text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Open Battle Royales</p><Flame size={18} className="text-[hsl(var(--accent))]" /></div>{openBattles.length ? <div className="space-y-3">{openBattles.map((b) => <Link key={b.id} href={`/battles/${b.id}`} className="flex items-center justify-between rounded-xl border border-[hsl(var(--border))] px-4 py-3 transition-colors hover:bg-[hsl(var(--muted)/.55)]" data-testid={`link-open-battle-${b.id}`}><div><p className="text-sm font-bold">{b.asset}</p><p className="font-mono-ui text-[9px] uppercase text-[hsl(var(--muted-foreground))]">{b.entrantCount} entrants · {formatTime(b.secondsLeft)} left</p></div><StatusPill tone="coral"><Crown size={10} />Battle Royale</StatusPill></Link>)}</div> : <p className="text-sm text-[hsl(var(--muted-foreground))]">No open battles yet — <Link href="/battles" className="font-bold text-[hsl(var(--accent))]">start one</Link>.</p>}</div></section> : null}<div className="mb-5 flex items-end justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Markets in play</p><h2 className="mt-1 font-display text-2xl font-bold tracking-[-.04em]">Pick your pressure point</h2></div><span className="font-mono-ui text-[10px] text-[hsl(var(--muted-foreground))]">{markets.length} LIVE WINDOWS</span></div>{query.isLoading ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div> : markets.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{markets.map((market: any, index: number) => <MarketCard key={market.marketId} market={market} index={index} battleEntrants={battleByMarket.get(market.marketId)} />)}</div> : <div className="rounded-2xl border border-dashed border-[hsl(var(--border))] p-12 text-center" data-testid="empty-markets"><p className="font-display text-xl font-bold">No markets are live right now.</p><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">The arena is between rounds. Check back soon.</p></div>}</div></div></AppShell>;
 }
 
 function WalletPredictionPanel({ detail }: { detail: any }) {
@@ -250,7 +376,7 @@ function WalletPredictionPanel({ detail }: { detail: any }) {
   const wallet = useWallet();
   const [direction, setDirection] = useState<'UP' | 'DOWN'>('UP');
   const [confidence, setConfidence] = useState(62);
-  const [quantity, setQuantity] = useState('25');
+  const [quantity, setQuantity] = useState('1');
   const [prepared, setPrepared] = useState<any>(null);
   const [txStep, setTxStep] = useState<'approval' | 'order' | ''>('');
   const [notice, setNotice] = useState('');
@@ -263,7 +389,7 @@ function WalletPredictionPanel({ detail }: { detail: any }) {
     setNotice('');
     create.mutate(
       { data: { marketId: detail.marketId, direction: direction === 'UP' ? PredictionInputDirection.UP : PredictionInputDirection.DOWN, confidence: Number(confidence), quantity: Number(quantity) } },
-      { onSuccess: setPrepared, onError: () => setNotice('The prediction could not be prepared. No wallet action was taken. Check the API connection and try again.') },
+      { onSuccess: setPrepared, onError: (err) => setNotice(err instanceof Error ? err.message : 'The prediction could not be prepared. No wallet action was taken.') },
     );
   };
 
@@ -300,9 +426,40 @@ function MarketPage() {
     }
   }, [battleMode, marketId]);
   const query = useGetMarket(marketId, { query: { queryKey: getGetMarketQueryKey(marketId), staleTime: 30000, retry: false } });
-  const source = (query.data as any) ?? fallbackMarkets.find((market) => market.marketId === marketId) ?? fallbackMarkets[0];
-  const detail = { ...source, question: source.question ?? `Will ${source.asset} close higher than it opened?`, openingPrice: source.openingPrice ?? '—', odds: source.odds ?? { pUp: source.aiPercent, bestBid: 0.48, bestAsk: 0.53 }, communityPercent: source.communityPercent ?? 57, userPercent: source.userPercent ?? null, isResolved: source.isResolved ?? false, isVoided: source.isVoided ?? false };
-  return <AppShell><div className="px-5 py-8 sm:px-8 lg:px-10"><div className="mx-auto max-w-[1160px]"><Link href="/" className="mb-4 inline-flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]" data-testid="link-back-arena">← Back to arena</Link><div className="mb-6 flex flex-wrap gap-2"><Link href={`/market/${detail.marketId}`} className={`rounded-full px-3 py-1.5 font-mono-ui text-[9px] font-bold uppercase tracking-[.1em] ${!battleMode ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>Market view</Link><Link href={`/market/${detail.marketId}?mode=battle`} className={`rounded-full px-3 py-1.5 font-mono-ui text-[9px] font-bold uppercase tracking-[.1em] ${battleMode ? 'bg-[hsl(var(--accent))] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`} data-testid="tab-battle-royale"><Users size={11} className="mr-1 inline" />Battle Royale</Link><Link href="/challenges" className="rounded-full bg-[hsl(var(--muted))] px-3 py-1.5 font-mono-ui text-[9px] font-bold uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))]"><Swords size={11} className="mr-1 inline" />1-on-1 Clash</Link></div>{query.isError && <ConnectionState error onRetry={() => query.refetch()} />}<div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]"><div className="rounded-[28px] bg-[hsl(var(--primary))] p-6 text-[hsl(var(--primary-foreground))] shadow-[var(--shadow-lg)] sm:p-9"><div className="flex items-start justify-between"><div><StatusPill tone="lime"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />{detail.tradable ? 'Trading live' : 'Locked'}</StatusPill><p className="mt-6 font-mono-ui text-[10px] uppercase tracking-[.15em] opacity-55">{detail.asset} · {formatTime(detail.intervalSec)}</p><h1 className="mt-2 max-w-xl font-display text-4xl font-extrabold leading-[.98] tracking-[-.06em] sm:text-6xl">{detail.question}</h1></div><span className="font-mono-ui text-[10px] opacity-50">#{detail.marketId}</span></div><div className="mt-12 grid grid-cols-2 gap-4 border-t border-white/15 pt-5 sm:grid-cols-4"><div><p className="font-mono-ui text-[9px] uppercase opacity-50">Locks in</p><p className="mt-1 font-mono-ui text-lg font-bold text-[hsl(var(--secondary))]">{formatTime(detail.secondsLeft)}</p></div><div><p className="font-mono-ui text-[9px] uppercase opacity-50">Pool</p><p className="mt-1 font-mono-ui text-lg font-bold">${Number(detail.pool ?? 0).toLocaleString()}</p></div><div><p className="font-mono-ui text-[9px] uppercase opacity-50">Opens at</p><p className="mt-1 font-mono-ui text-lg font-bold">{detail.openingPrice}</p></div><div><p className="font-mono-ui text-[9px] uppercase opacity-50">Venue</p><p className="mt-1 font-mono-ui text-sm font-bold">{detail.venueId ?? 'Somnia'}</p></div></div></div><div className="space-y-5" id="battle-royale-panel">{battleMode ? <BattleRoyalePanel marketId={detail.marketId} tradable={detail.tradable} aiPercent={detail.aiPercent} marketUpPercent={detail.communityPercent} wallet={wallet} /> : <><BattleRoyalePanel marketId={detail.marketId} tradable={detail.tradable} aiPercent={detail.aiPercent} marketUpPercent={detail.communityPercent} wallet={wallet} /><div><p className="mb-2 font-mono-ui text-[10px] uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Or post a 1-on-1 duel</p><WalletPredictionPanel detail={detail} /></div></>}</div></div><div className="mt-5 grid gap-5 md:grid-cols-2"><section className="rounded-[24px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6"><div className="mb-5 flex items-center justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Signal room</p><h2 className="mt-1 font-display text-xl font-bold">Where the room stands</h2></div><Gauge size={20} className="text-[hsl(var(--accent))]" /></div><div className="mb-6 flex items-end justify-between"><div><span className="font-display text-5xl font-bold">{detail.odds.pUp ?? '—'}%</span><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">AI Up consensus</p></div><Sparkline hot /></div><div className="space-y-4 text-xs"><div><div className="mb-1.5 flex justify-between"><span>AI read</span><strong>{detail.odds.pUp ?? 0}% Up</strong></div><div className="h-2 rounded-full bg-[hsl(var(--muted))]"><div className="h-full rounded-full bg-[hsl(var(--accent))]" style={{ width: `${detail.odds.pUp ?? 50}%` }} /></div></div><div><div className="mb-1.5 flex justify-between"><span>Community</span><strong>{detail.communityPercent ?? 0}% Up</strong></div><div className="h-2 rounded-full bg-[hsl(var(--muted))]"><div className="h-full rounded-full bg-[hsl(var(--secondary-foreground))]" style={{ width: `${detail.communityPercent ?? 50}%` }} /></div></div></div></section><section className="rounded-[24px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6"><p className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Odds board</p><h2 className="mt-1 font-display text-xl font-bold">The spread, plainly</h2><div className="mt-6 grid grid-cols-3 gap-2 text-center"><div className="rounded-xl bg-[hsl(var(--muted))] p-3"><p className="font-mono-ui text-[9px] text-[hsl(var(--muted-foreground))]">BEST BID</p><p className="mt-2 font-display text-2xl font-bold">{detail.odds.bestBid ?? '—'}</p></div><div className="rounded-xl bg-[hsl(var(--secondary)/.55)] p-3"><p className="font-mono-ui text-[9px] text-[hsl(var(--muted-foreground))]">P(UP)</p><p className="mt-2 font-display text-2xl font-bold">{detail.odds.pUp ?? '—'}%</p></div><div className="rounded-xl bg-[hsl(var(--muted))] p-3"><p className="font-mono-ui text-[9px] text-[hsl(var(--muted-foreground))]">BEST ASK</p><p className="mt-2 font-display text-2xl font-bold">{detail.odds.bestAsk ?? '—'}</p></div></div><div className="mt-6 flex gap-3 rounded-xl border border-dashed border-[hsl(var(--border))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-[hsl(var(--secondary-foreground))]" />Outcomes are verified by the Somnia event contract. Energy and Rating are points only; there is no cash payout.</div></section></div></div></div></AppShell>;
+  // Never swap in a different preview market (somnia-eth-15m) while a real hex id is loading.
+  const matchedFallback = fallbackMarkets.find((market) => market.marketId === marketId);
+  const source =
+    (query.data as any) ??
+    matchedFallback ??
+    ({
+      marketId,
+      asset: 'Loading…',
+      intervalSec: 0,
+      secondsLeft: 0,
+      tradable: false,
+      aiPercent: null,
+      pool: 0,
+      venueId: null,
+      openingPrice: '—',
+      odds: { pUp: null, bestBid: null, bestAsk: null },
+    } as const);
+  const detail = {
+    ...source,
+    marketId,
+    question: formatQuestion(source.question, source.asset),
+    openingPrice: source.openingPrice ?? '—',
+    odds: source.odds ?? { pUp: source.aiPercent, bestBid: 0.48, bestAsk: 0.53 },
+    communityPercent: source.communityPercent ?? 57,
+    userPercent: source.userPercent ?? null,
+    isResolved: source.isResolved ?? false,
+    isVoided: source.isVoided ?? false,
+    tradable:
+      source.tradable ??
+      (!source.isResolved &&
+        !source.isVoided &&
+        (source.secondsLeft ?? 0) >= 60),
+  };
+  return <AppShell><div className="px-5 py-8 sm:px-8 lg:px-10"><div className="mx-auto max-w-[1160px]"><Link href="/" className="mb-4 inline-flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]" data-testid="link-back-arena">← Back to arena</Link><div className="mb-6 flex flex-wrap gap-2"><Link href={`/market/${marketId}`} className={`rounded-full px-3 py-1.5 font-mono-ui text-[9px] font-bold uppercase tracking-[.1em] ${!battleMode ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>Market view</Link><Link href={`/market/${marketId}?mode=battle`} className={`rounded-full px-3 py-1.5 font-mono-ui text-[9px] font-bold uppercase tracking-[.1em] ${battleMode ? 'bg-[hsl(var(--accent))] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`} data-testid="tab-battle-royale"><Users size={11} className="mr-1 inline" />Battle Royale</Link><Link href="/challenges" className="rounded-full bg-[hsl(var(--muted))] px-3 py-1.5 font-mono-ui text-[9px] font-bold uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))]"><Swords size={11} className="mr-1 inline" />1-on-1 Clash</Link></div>{query.isError && <ConnectionState error onRetry={() => query.refetch()} />}{query.isLoading && !query.data ? <ConnectionState /> : null}<div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]"><div className="relative min-w-0 overflow-hidden rounded-[28px] bg-[hsl(var(--primary))] p-6 text-[hsl(var(--primary-foreground))] shadow-[var(--shadow-lg)] sm:p-9"><div className="flex items-start justify-between"><div><StatusPill tone="lime"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />{detail.tradable ? 'Trading live' : 'Locked'}</StatusPill><p className="mt-6 font-mono-ui text-[10px] uppercase tracking-[.15em] opacity-55">{detail.asset} · {formatTime(detail.intervalSec)}</p><h1 className="mt-2 max-w-xl font-display text-2xl font-extrabold leading-[1.15] tracking-[-.04em] sm:text-4xl break-words">{detail.question}</h1></div><span className="max-w-[9rem] truncate font-mono-ui text-[10px] opacity-50" title={marketId}>#{shortWallet(marketId)}</span></div><div className="mt-10 grid min-w-0 grid-cols-2 gap-3 border-t border-white/15 pt-5 sm:grid-cols-4"><div><p className="font-mono-ui text-[9px] uppercase opacity-50">Locks in</p><p className="mt-1 font-mono-ui text-lg font-bold text-[hsl(var(--secondary))]">{formatTime(detail.secondsLeft)}</p></div><div><p className="font-mono-ui text-[9px] uppercase opacity-50">Window</p><p className="mt-1 font-mono-ui text-lg font-bold">{formatInterval(detail.intervalSec)}</p></div><div><p className="font-mono-ui text-[9px] uppercase opacity-50">Opens at</p><p className="mt-1 truncate font-mono-ui text-lg font-bold">{formatOpeningPrice(detail.openingPrice)}</p></div><div><p className="font-mono-ui text-[9px] uppercase opacity-50">Venue</p><p className="mt-1 truncate font-mono-ui text-sm font-bold">{formatVenue(detail.venueId)}</p></div></div></div><div className="space-y-5" id="battle-royale-panel">{battleMode ? <BattleRoyalePanel marketId={marketId} tradable={detail.tradable} aiPercent={detail.aiPercent} marketUpPercent={detail.communityPercent} wallet={wallet} /> : <><BattleRoyalePanel marketId={marketId} tradable={detail.tradable} aiPercent={detail.aiPercent} marketUpPercent={detail.communityPercent} wallet={wallet} /><div><p className="mb-2 font-mono-ui text-[10px] uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Or post a 1-on-1 duel</p><WalletPredictionPanel detail={detail} /></div></>}</div></div><div className="mt-5 grid gap-5 md:grid-cols-2"><section className="rounded-[24px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6"><div className="mb-5 flex items-center justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Signal room</p><h2 className="mt-1 font-display text-xl font-bold">Where the room stands</h2></div><Gauge size={20} className="text-[hsl(var(--accent))]" /></div><div className="mb-6 flex items-end justify-between"><div><span className="font-display text-5xl font-bold tabular-nums">{formatPercent(detail.odds?.pUp ?? detail.aiPercent)}</span><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{detail.odds?.pUp != null ? "Book Up mid" : "AI Up consensus"}</p></div><Sparkline hot /></div><div className="space-y-4 text-xs"><div><div className="mb-1.5 flex justify-between"><span>AI read</span><strong>{formatPercent(detail.odds?.pUp ?? detail.aiPercent, '0%')} Up</strong></div><div className="h-2 rounded-full bg-[hsl(var(--muted))]"><div className="h-full rounded-full bg-[hsl(var(--accent))]" style={{ width: `${asPercentPoints(detail.odds?.pUp ?? detail.aiPercent) ?? 50}%` }} /></div></div><div><div className="mb-1.5 flex justify-between"><span>Community</span><strong>{formatPercent(detail.communityPercent, '0%')} Up</strong></div><div className="h-2 rounded-full bg-[hsl(var(--muted))]"><div className="h-full rounded-full bg-[hsl(var(--secondary-foreground))]" style={{ width: `${asPercentPoints(detail.communityPercent) ?? 50}%` }} /></div></div></div></section><section className="rounded-[24px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6"><p className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Odds board</p><h2 className="mt-1 font-display text-xl font-bold">The spread, plainly</h2><div className="mt-6 grid grid-cols-3 gap-2 text-center"><div className="rounded-xl bg-[hsl(var(--muted))] p-3"><p className="font-mono-ui text-[9px] text-[hsl(var(--muted-foreground))]">BEST BID</p><p className="mt-2 font-display text-2xl font-bold tabular-nums">{formatPercent(detail.odds?.bestBid)}</p></div><div className="rounded-xl bg-[hsl(var(--secondary)/.55)] p-3"><p className="font-mono-ui text-[9px] text-[hsl(var(--muted-foreground))]">P(UP)</p><p className="mt-2 font-display text-2xl font-bold tabular-nums">{formatPercent(detail.odds?.pUp ?? detail.aiPercent)}</p></div><div className="rounded-xl bg-[hsl(var(--muted))] p-3"><p className="font-mono-ui text-[9px] text-[hsl(var(--muted-foreground))]">BEST ASK</p><p className="mt-2 font-display text-2xl font-bold tabular-nums">{formatPercent(detail.odds?.bestAsk)}</p></div></div><div className="mt-6 flex gap-3 rounded-xl border border-dashed border-[hsl(var(--border))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-[hsl(var(--secondary-foreground))]" />Outcomes are verified by the Somnia event contract. Energy and Rating are points only; there is no cash payout.</div></section></div></div></div></AppShell>;
 }
 
 function ChallengeCard({ item, onChallenge }: { item: any; onChallenge: (item: any) => void }) {

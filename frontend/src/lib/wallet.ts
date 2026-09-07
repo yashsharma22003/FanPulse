@@ -1,3 +1,5 @@
+import { getAddress } from 'viem';
+
 export type UnsignedTransaction = {
   to: string;
   data: string;
@@ -71,8 +73,11 @@ export function createSiweMessage({
   chainId: number;
   nonce: string;
 }) {
+  // SIWE (EIP-4361) requires an EIP-55 checksummed address — wallets often
+  // return lowercase, which makes `new SiweMessage(message)` throw 400.
+  const checksummed = getAddress(address as `0x${string}`);
   return `${domain} wants you to sign in with your Ethereum account:
-${address}
+${checksummed}
 
 Sign in to FanPulse
 

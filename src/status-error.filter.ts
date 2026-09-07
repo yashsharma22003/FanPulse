@@ -18,11 +18,15 @@ export class StatusErrorFilter implements ExceptionFilter {
         .json(typeof body === 'string' ? { statusCode: exception.getStatus(), message: body } : body);
       return;
     }
-    const err = exception as Error & { status?: number };
+    const err = exception as Error & { status?: number; shortMessage?: string };
     const status = err.status ?? HttpStatus.INTERNAL_SERVER_ERROR;
-    res.status(status).json({
-      statusCode: status,
-      message: err.message ?? 'Internal server error',
+    const message =
+      err.message ||
+      err.shortMessage ||
+      'Internal server error';
+    res.status(status >= 400 && status < 600 ? status : HttpStatus.INTERNAL_SERVER_ERROR).json({
+      statusCode: status >= 400 && status < 600 ? status : HttpStatus.INTERNAL_SERVER_ERROR,
+      message,
     });
   }
 }

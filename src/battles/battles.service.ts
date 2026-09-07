@@ -132,13 +132,22 @@ export class BattlesService {
     }
 
     const kind = this.dreamdex.kindForDirection(prediction.direction);
-    const proof = await this.dreamdex.verifyFill({
-      txHash: txHash as Hex,
-      wallet: getAddress(user.wallet) as Address,
-      marketId: prediction.market.marketId,
-      expectedKind: kind,
-      pool: prediction.market.pool as Address,
-    });
+    let proof;
+    try {
+      proof = await this.dreamdex.verifyFill({
+        txHash: txHash as Hex,
+        wallet: getAddress(user.wallet) as Address,
+        marketId: prediction.market.marketId,
+        expectedKind: kind,
+        pool: prediction.market.pool as Address,
+      });
+    } catch (err) {
+      const e = err as Error & { status?: number };
+      if (e.status === 403) throw new ForbiddenException(e.message);
+      throw new BadRequestException(
+        e.message || 'Could not verify on-chain fill for this battle entry',
+      );
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.prediction.update({
@@ -212,7 +221,7 @@ export class BattlesService {
     const market = await this.prisma.market.findUnique({
       where: { marketId: marketId.toLowerCase() },
     });
-    if (!market) throw new NotFoundException('Market not found');
+    if (!market) return null;
     const battle = await this.prisma.battle.findUnique({
       where: { marketRowId: market.id },
       include: {
@@ -226,7 +235,7 @@ export class BattlesService {
         },
       },
     });
-    if (!battle) throw new NotFoundException('No battle for this market');
+    if (!battle) return null;
     return this.serializeDetail(battle, wallet);
   }
 

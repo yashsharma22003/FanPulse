@@ -207,14 +207,18 @@ function SignalBars({
   battleUp?: number | null;
   marketUp?: number | null;
 }) {
+  const toPts = (value?: number | null) => {
+    if (value == null || !Number.isFinite(value)) return null;
+    return value <= 1 ? value * 100 : value;
+  };
   const rows = [
-    { label: 'AI consensus', value: ai, color: 'bg-[hsl(var(--accent))]' },
+    { label: 'AI consensus', value: toPts(ai), color: 'bg-[hsl(var(--accent))]' },
     {
       label: 'Battle arena',
-      value: battleUp,
+      value: toPts(battleUp),
       color: 'bg-[hsl(var(--secondary-foreground))]',
     },
-    { label: 'Whole market', value: marketUp, color: 'bg-[hsl(var(--primary))]' },
+    { label: 'Whole market', value: toPts(marketUp), color: 'bg-[hsl(var(--primary))]' },
   ];
   return (
     <div className="space-y-3">
@@ -222,14 +226,14 @@ function SignalBars({
         <div key={row.label}>
           <div className="mb-1 flex justify-between text-[10px]">
             <span className="text-[hsl(var(--muted-foreground))]">{row.label}</span>
-            <strong className="font-mono-ui">
-              {row.value != null ? `${row.value}% Up` : '—'}
+            <strong className="font-mono-ui tabular-nums">
+              {row.value != null ? `${Math.round(row.value)}% Up` : '—'}
             </strong>
           </div>
-          <div className="h-1.5 rounded-full bg-[hsl(var(--muted))]">
+          <div className="h-1.5 overflow-hidden rounded-full bg-[hsl(var(--muted))]">
             <div
               className={`h-full rounded-full ${row.color}`}
-              style={{ width: `${row.value ?? 50}%` }}
+              style={{ width: `${Math.min(100, Math.max(0, row.value ?? 0))}%` }}
             />
           </div>
         </div>
@@ -264,7 +268,7 @@ export function BattleRoyalePanel({
   const battle = battleQuery.data;
   const [direction, setDirection] = useState<'UP' | 'DOWN'>('UP');
   const [confidence, setConfidence] = useState(65);
-  const [quantity, setQuantity] = useState('25');
+  const [quantity, setQuantity] = useState('1');
   const [prepared, setPrepared] = useState<Awaited<
     ReturnType<typeof enter.mutateAsync>
   > | null>(null);

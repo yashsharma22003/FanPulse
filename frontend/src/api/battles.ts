@@ -70,8 +70,11 @@ export async function fetchMarketBattle(
   marketId: string,
   signal?: AbortSignal,
 ): Promise<BattleDetail | null> {
+  if (!marketId.startsWith('0x')) return null;
   try {
-    return await customFetch<BattleDetail>(getMarketBattleUrl(marketId), { signal });
+    return await customFetch<BattleDetail | null>(getMarketBattleUrl(marketId), {
+      signal,
+    });
   } catch (err) {
     const status = (err as { status?: number }).status;
     if (status === 404) return null;
@@ -88,7 +91,7 @@ export function useGetMarketBattle(
   return useQuery({
     queryKey: getMarketBattleQueryKey(marketId),
     queryFn: ({ signal }) => fetchMarketBattle(marketId, signal),
-    enabled: Boolean(marketId),
+    enabled: Boolean(marketId) && marketId.startsWith('0x'),
     staleTime: 3000,
     refetchInterval: (query) => {
       const status = query.state.data?.status;

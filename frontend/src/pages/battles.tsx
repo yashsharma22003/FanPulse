@@ -150,7 +150,16 @@ function BattleCard({ battle }: { battle: BattleListItem }) {
       <div className="mt-auto flex items-center justify-between border-t border-[hsl(var(--border))] pt-4">
         {battle.battleUpPercent != null ? (
           <p className="text-xs text-[hsl(var(--muted-foreground))]">
-            Arena: <strong>{battle.battleUpPercent}%</strong> Up
+            Arena:{' '}
+            <strong className="tabular-nums">
+              {Math.round(
+                battle.battleUpPercent <= 1
+                  ? battle.battleUpPercent * 100
+                  : battle.battleUpPercent,
+              )}
+              %
+            </strong>{' '}
+            Up
           </p>
         ) : (
           <span />
