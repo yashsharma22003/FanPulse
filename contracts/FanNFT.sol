@@ -20,6 +20,8 @@ contract FanNFT {
 
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event TierUpdated(address indexed wallet, uint256 indexed tokenId, Tier newTier);
+    /// @dev ERC-4906 — tells explorers to re-fetch dynamic tokenURI after tier changes.
+    event MetadataUpdate(uint256 _tokenId);
 
     string public constant name = "FanPulse Fan NFT";
     string public constant symbol = "FANPULSE";
@@ -57,6 +59,7 @@ contract FanNFT {
         }
         tierOf[tokenId] = newTier;
         emit TierUpdated(wallet, tokenId, newTier);
+        emit MetadataUpdate(tokenId);
     }
 
     function balanceOf(address wallet) public view returns (uint256) {
@@ -88,7 +91,11 @@ contract FanNFT {
     }
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == 0x80ac58cd || interfaceId == 0x5b5e139f || interfaceId == 0x01ffc9a7;
+        return
+            interfaceId == 0x80ac58cd || // ERC721
+            interfaceId == 0x5b5e139f || // ERC721Metadata
+            interfaceId == 0x01ffc9a7 || // ERC165
+            interfaceId == 0x49064906; // ERC4906 MetadataUpdate
     }
 
     function transferFrom(address, address, uint256) external pure {

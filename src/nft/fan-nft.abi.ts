@@ -39,4 +39,9 @@ export const fanNftAbi = [
       { name: 'newTier', type: 'uint8', indexed: false },
     ],
   },
+  {
+    type: 'event',
+    name: 'MetadataUpdate',
+    inputs: [{ name: '_tokenId', type: 'uint256', indexed: false }],
+  },
 ] as const;
