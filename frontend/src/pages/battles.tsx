@@ -6,8 +6,6 @@ import {
   Clock3,
   Crown,
   RefreshCw,
-  ShieldCheck,
-  Swords,
   Users,
   Zap,
 } from 'lucide-react';
@@ -49,44 +47,6 @@ function StatusPill({
   );
 }
 
-function ModeCompare() {
-  return (
-    <div className="grid gap-4 md:grid-cols-2" data-testid="mode-compare">
-      <div className="rounded-[22px] border-2 border-[hsl(var(--accent)/.4)] bg-[hsl(var(--accent)/.08)] p-5">
-        <div className="mb-3 flex items-center gap-2">
-          <Users size={18} className="text-[hsl(var(--accent))]" />
-          <p className="font-mono-ui text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--accent))]">
-            Battle Royale
-          </p>
-        </div>
-        <h3 className="font-display text-xl font-bold">Everyone in the arena</h3>
-        <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-          Unlimited entrants per market window. All correct callers win tiered Energy —
-          ranked by conviction. Live leaderboard while entries are open.
-        </p>
-      </div>
-      <div className="rounded-[22px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5">
-        <div className="mb-3 flex items-center gap-2">
-          <Swords size={18} className="text-[hsl(var(--muted-foreground))]" />
-          <p className="font-mono-ui text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">
-            1-on-1 Clash
-          </p>
-        </div>
-        <h3 className="font-display text-xl font-bold">Head-to-head duel</h3>
-        <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-          One predictor, one challenger, opposite sides. Winner takes the duel Energy.
-          Find open calls on the Clashes feed.
-        </p>
-        <Link
-          href="/challenges"
-          className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[hsl(var(--foreground))] hover:text-[hsl(var(--accent))]"
-        >
-          Go to Clashes <ChevronRight size={14} />
-        </Link>
-      </div>
-    </div>
-  );
-}
 
 function BattleCard({ battle }: { battle: BattleListItem }) {
   const tone =
@@ -132,20 +92,15 @@ function BattleCard({ battle }: { battle: BattleListItem }) {
         </div>
       </div>
 
-      <div className="mb-4 rounded-xl bg-[hsl(var(--muted)/.55)] p-4">
-        <p className="font-mono-ui text-[10px] uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">
-          Arena snapshot
-        </p>
-        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-          <strong className="text-[hsl(var(--foreground))]">{battle.entrantCount}</strong>{' '}
-          {battle.entrantCount === 1 ? 'fan has' : 'fans have'} entered.
-          {battle.status === 'OPEN'
-            ? ' Leaderboard updates live — join before the window locks.'
-            : battle.status === 'LOCKED'
-              ? ' Locked in — awaiting DreamDEX settlement.'
-              : ' Final placements and Energy payouts are in.'}
-        </p>
-      </div>
+      <p className="mb-4 text-sm text-[hsl(var(--muted-foreground))]">
+        <strong className="text-[hsl(var(--foreground))]">{battle.entrantCount}</strong>{' '}
+        {battle.entrantCount === 1 ? 'entrant' : 'entrants'}
+        {battle.status === 'OPEN'
+          ? ' · open'
+          : battle.status === 'LOCKED'
+            ? ' · awaiting settlement'
+            : ' · settled'}
+      </p>
 
       <div className="mt-auto flex items-center justify-between border-t border-[hsl(var(--border))] pt-4">
         {battle.battleUpPercent != null ? (
@@ -248,14 +203,8 @@ export function BattlesPage({
     <div className="px-5 py-8 sm:px-8 lg:px-10">
       <div className="mx-auto max-w-[1200px]">
         <PageIntro
-          eyebrow="Battle Royale mode"
-          title={
-            <>
-              All fans. One window.
-              <br />
-              <span className="text-[hsl(var(--accent))]">Rank by conviction.</span>
-            </>
-          }
+          eyebrow="Battle Royale"
+          title={<>Live arenas</>}
         >
           <div className="flex items-center gap-2 rounded-xl bg-[hsl(var(--accent)/.15)] px-4 py-3 text-right">
             <Crown className="text-[hsl(var(--accent))]" size={20} />
@@ -271,10 +220,6 @@ export function BattlesPage({
         </PageIntro>
 
         {hasError && <ConnectionState error onRetry={refetchAll} />}
-
-        <div className="mb-8">
-          <ModeCompare />
-        </div>
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap rounded-xl bg-[hsl(var(--muted))] p-1">
@@ -332,22 +277,15 @@ export function BattlesPage({
               No {filter === 'active' ? 'active' : filter.toLowerCase()} battles yet
             </p>
             <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-              Pick a live market below and be the first to open the arena.
+              Pick a live market to open one.
             </p>
           </div>
         )}
 
         {filter === 'active' || filter === 'OPEN' ? (
           <section className="mt-12">
-            <div className="mb-5 flex items-end justify-between">
-              <div>
-                <p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">
-                  Start a new arena
-                </p>
-                <h2 className="mt-1 font-display text-2xl font-bold">
-                  Tradable markets without a battle yet
-                </h2>
-              </div>
+            <div className="mb-5">
+              <h2 className="font-display text-xl font-bold">Start a battle</h2>
             </div>
             {newArenas.length ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -372,17 +310,12 @@ export function BattlesPage({
               </div>
             ) : (
               <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                Every tradable market already has an active battle — join one above.
+                Every live market already has a battle.
               </p>
             )}
           </section>
         ) : null}
 
-        <p className="mt-8 flex items-center gap-2 text-[10px] text-[hsl(var(--muted-foreground))]">
-          <ShieldCheck size={13} />
-          Battle Royale uses real DreamDEX trades. Energy rewards are tiered for all
-          correct callers; wrong side earns nothing.
-        </p>
       </div>
     </div>
   );

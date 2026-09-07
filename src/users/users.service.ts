@@ -32,6 +32,19 @@ export class UsersService {
 
     const history = user.predictions.map((p) => {
       const challenge = p.originalChallenge ?? p.challengerChallenge;
+      const role = p.originalChallenge
+        ? 'original'
+        : p.challengerChallenge
+          ? 'challenger'
+          : null;
+      let result: string = p.status;
+      if (challenge?.status === 'LOCKED') result = 'LOCKED';
+      else if (challenge?.status === 'VOIDED') result = 'VOIDED';
+      else if (challenge?.status === 'RESOLVED') {
+        result = challenge.winnerUserId === user.id ? 'WIN' : 'LOSS';
+      } else if (p.status === 'OPEN') result = 'OPEN';
+      else if (p.status === 'PENDING') result = 'PENDING';
+
       return {
         predictionId: p.id,
         marketId: p.market.marketId,
@@ -40,6 +53,14 @@ export class UsersService {
         confidence: Number(p.confidence),
         quantityFilled: p.quantityFilled.toString(),
         status: p.status,
+        role,
+        result,
+        energy:
+          challenge?.status === 'RESOLVED' && challenge.winnerUserId === user.id
+            ? challenge.energyPaid.toString()
+            : challenge?.status === 'RESOLVED'
+              ? '0'
+              : null,
         challenge: challenge
           ? {
               id: challenge.id,

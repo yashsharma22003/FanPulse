@@ -4,7 +4,7 @@ export default function NotFound() {
       <div className="max-w-md text-center">
         <h1 className="font-display text-3xl font-extrabold">Page not found</h1>
         <p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">
-          That route is not part of the FanPulse arena.
+          Page not found.
         </p>
         <a
           href="/"

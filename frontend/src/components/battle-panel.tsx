@@ -18,10 +18,10 @@ import {
   type BattleDetail,
   type BattleEntryRow,
 } from '@/api/battles';
-import { broadcastOrder, connectToSomnia } from '@/lib/wallet';
+import { broadcastOrder, connectToSomnia, formatWalletError } from '@/lib/wallet';
 
 function shortWallet(wallet?: string) {
-  if (!wallet) return '—';
+  if (!wallet) return '-';
   return wallet.length > 11 ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : wallet;
 }
 
@@ -102,10 +102,7 @@ export function BattleLeaderboard({
         data-testid="empty-battle-leaderboard"
       >
         <Users className="mx-auto text-[hsl(var(--accent))]" size={28} />
-        <p className="mt-3 font-display text-lg font-bold">Arena is empty</p>
-        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-          Be the first fan in this Battle Royale window.
-        </p>
+        <p className="mt-3 font-display text-lg font-bold">No entrants yet</p>
       </div>
     );
   }
@@ -119,7 +116,7 @@ export function BattleLeaderboard({
       <div className="rounded-2xl border border-dashed border-[hsl(var(--border))] p-8 text-center">
         <p className="font-display text-lg font-bold">Waiting for entrants</p>
         <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-          {formatTime(battle.secondsLeft)} until the arena locks.
+          Locks in {formatTime(battle.secondsLeft)}
         </p>
       </div>
     );
@@ -212,13 +209,13 @@ function SignalBars({
     return value <= 1 ? value * 100 : value;
   };
   const rows = [
-    { label: 'AI consensus', value: toPts(ai), color: 'bg-[hsl(var(--accent))]' },
+    { label: 'AI', value: toPts(ai), color: 'bg-[hsl(var(--accent))]' },
     {
-      label: 'Battle arena',
+      label: 'Arena',
       value: toPts(battleUp),
       color: 'bg-[hsl(var(--secondary-foreground))]',
     },
-    { label: 'Whole market', value: toPts(marketUp), color: 'bg-[hsl(var(--primary))]' },
+    { label: 'Market', value: toPts(marketUp), color: 'bg-[hsl(var(--primary))]' },
   ];
   return (
     <div className="space-y-3">
@@ -227,7 +224,7 @@ function SignalBars({
           <div className="mb-1 flex justify-between text-[10px]">
             <span className="text-[hsl(var(--muted-foreground))]">{row.label}</span>
             <strong className="font-mono-ui tabular-nums">
-              {row.value != null ? `${Math.round(row.value)}% Up` : '—'}
+              {row.value != null ? `${Math.round(row.value)}% Up` : '-'}
             </strong>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-[hsl(var(--muted))]">
@@ -297,8 +294,16 @@ export function BattleRoyalePanel({
       },
       {
         onSuccess: setPrepared,
-        onError: () =>
-          setNotice('Could not prepare battle entry. Check wallet and API.'),
+        onError: (err) => {
+          const msg =
+            err instanceof Error ? err.message : 'Could not prepare battle entry.';
+          if (/401|Unauthorized/i.test(msg)) {
+            setNotice('Sign in with your wallet again (SIWE session expired).');
+            wallet.openConnect();
+            return;
+          }
+          setNotice(msg.replace(/^HTTP \d+ [^:]+:\s*/i, '') || msg);
+        },
       },
     );
   };
@@ -314,6 +319,7 @@ export function BattleRoyalePanel({
         prepared.order,
         setTxStep,
       );
+      setTxStep('');
       await confirm.mutateAsync({
         predictionId: prepared.prediction.id,
         txHash: hash,
@@ -326,11 +332,7 @@ export function BattleRoyalePanel({
       setNotice('You are in the arena. Good luck.');
     } catch (caught) {
       setTxStep('');
-      setNotice(
-        caught instanceof Error
-          ? caught.message
-          : 'Wallet transaction did not complete.',
-      );
+      setNotice(formatWalletError(caught));
     }
   };
 
@@ -350,11 +352,8 @@ export function BattleRoyalePanel({
     >
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-mono-ui text-[10px] uppercase tracking-[.15em] text-[hsl(var(--accent))]">
+          <h3 className="font-display text-xl font-bold text-[hsl(var(--accent))]">
             Battle Royale
-          </p>
-          <h3 className="mt-1 font-display text-xl font-bold">
-            The arena is open
           </h3>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -370,13 +369,13 @@ export function BattleRoyalePanel({
         </div>
       </div>
 
-      <div className="mb-5 grid gap-3 rounded-2xl bg-[hsl(var(--muted)/.65)] p-4 sm:grid-cols-3">
+      <div className="mb-5 grid gap-3 rounded-2xl bg-[hsl(var(--muted)/.65)] p-4 sm:grid-cols-2">
         <div>
           <p className="font-mono-ui text-[9px] uppercase text-[hsl(var(--muted-foreground))]">
             Locks in
           </p>
           <p className="mt-1 font-mono-ui text-sm font-bold">
-            {battle ? formatTime(battle.secondsLeft) : '—'}
+            {battle ? formatTime(battle.secondsLeft) : '-'}
           </p>
         </div>
         <div>
@@ -386,12 +385,6 @@ export function BattleRoyalePanel({
           <p className="mt-1 font-display text-lg font-bold">
             {battle?.entrantCount ?? 0}
           </p>
-        </div>
-        <div>
-          <p className="font-mono-ui text-[9px] uppercase text-[hsl(var(--muted-foreground))]">
-            Mode
-          </p>
-          <p className="mt-1 text-xs font-bold">Classic · all vs all</p>
         </div>
       </div>
 
@@ -429,17 +422,11 @@ export function BattleRoyalePanel({
           <p className="mt-1 font-display text-2xl font-bold">
             {battle.winningDirection} won
           </p>
-          <p className="mt-1 text-xs opacity-70">
-            Correct callers ranked by conviction · tiered Energy rewards
-          </p>
         </div>
       )}
 
       {canJoin && (
         <div className="mt-6 border-t border-[hsl(var(--border))] pt-6">
-          <p className="mb-4 font-mono-ui text-[10px] uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">
-            Join the battle
-          </p>
           {prepared ? (
             <div className="rounded-2xl bg-[hsl(var(--accent)/.12)] p-4">
               <StatusPill tone="coral">
@@ -543,8 +530,7 @@ export function BattleRoyalePanel({
 
       {battle?.status === 'LOCKED' && (
         <p className="mt-5 text-center text-xs text-[hsl(var(--muted-foreground))]">
-          Arena locked — waiting for DreamDEX settlement. Leaderboard updates when
-          the market resolves.
+          Locked. Leaderboard updates on settlement.
         </p>
       )}
     </div>

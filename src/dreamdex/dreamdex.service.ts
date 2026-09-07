@@ -272,21 +272,57 @@ export class DreamdexService implements OnModuleInit, OnModuleDestroy {
     const one = 10n ** BigInt(decimals);
     const tick = params.tickSize;
 
+    // IOC reverts with zero fill — fail early so wallets don't show a fake "gas limit" error.
+    if (side === 'BUY_YES' && book.yesAsks[0] === undefined) {
+      throw Object.assign(
+        new Error(
+          'No Up liquidity on this book right now. Pick another market or wait a minute for makers.',
+        ),
+        { status: 400 },
+      );
+    }
+    if (side === 'BUY_NO' && book.noAsks[0] === undefined) {
+      throw Object.assign(
+        new Error(
+          'No Down liquidity on this book right now. Pick another market or wait a minute for makers.',
+        ),
+        { status: 400 },
+      );
+    }
+
     let yesPrice: bigint;
     if (side === 'BUY_YES') {
-      const ask = book.yesAsks[0]?.price;
-      yesPrice = ask !== undefined ? this.snapUp(ask + tick * 10n, tick, one) : this.snapDown(one - tick, tick);
+      const ask = book.yesAsks[0]!.price;
+      // Cross the spread aggressively so IOC can fill on thin Shannon books.
+      yesPrice = this.snapUp(ask + tick * 25n, tick, one);
     } else {
-      const noAsk = book.noAsks[0]?.price;
-      if (noAsk !== undefined) {
-        const complementary = one > noAsk ? one - noAsk : tick;
-        yesPrice = this.snapDown(complementary > tick * 10n ? complementary - tick * 10n : tick, tick);
-      } else {
-        yesPrice = tick;
-      }
+      const noAsk = book.noAsks[0]!.price;
+      const complementary = one > noAsk ? one - noAsk : tick;
+      yesPrice = this.snapDown(
+        complementary > tick * 25n ? complementary - tick * 25n : tick,
+        tick,
+      );
     }
     if (yesPrice < tick) yesPrice = tick;
     if (yesPrice >= one) yesPrice = one - tick;
+
+    const levels = side === 'BUY_YES' ? book.yesAsks : book.noAsks;
+    const limit =
+      side === 'BUY_YES' ? yesPrice : one > yesPrice ? one - yesPrice : tick;
+    let depth = 0n;
+    for (const level of levels) {
+      if (level.price > limit) break;
+      depth += level.quantity;
+      if (depth >= qty) break;
+    }
+    if (depth < qty) {
+      throw Object.assign(
+        new Error(
+          `Not enough ${opts.direction === 'UP' ? 'Up' : 'Down'} liquidity to fill ${this.toHuman(qty, decimals)} tUSDC (ImmediateOrCancelNoFill). Try a smaller size or another market with a deeper book.`,
+        ),
+        { status: 400 },
+      );
+    }
 
     const nowSec = BigInt(Math.floor(Date.now() / 1000));
     const marketExpiry = onchain.expiry;

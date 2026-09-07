@@ -60,6 +60,7 @@ export class BattlesService {
       throw new ConflictException('You have already entered this battle');
     }
 
+    // PENDING means the wallet never confirmed — replace so the user can retry.
     const pendingBattle = await this.prisma.prediction.findFirst({
       where: {
         userId: user.userId,
@@ -68,10 +69,7 @@ export class BattlesService {
       },
     });
     if (pendingBattle) {
-      throw new ConflictException({
-        message: 'You have a pending battle entry to confirm',
-        predictionId: pendingBattle.id,
-      });
+      await this.prisma.prediction.delete({ where: { id: pendingBattle.id } });
     }
 
     const prepared = await this.dreamdex

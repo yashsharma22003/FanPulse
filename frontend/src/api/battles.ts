@@ -53,6 +53,9 @@ export type EnterBattleResponse = {
   order: {
     approval: { to: string; data: string; value: string; chainId: number; description: string };
     order: { to: string; data: string; value: string; chainId: number; description: string };
+    collateral?: string;
+    pool?: string;
+    quantityRaw?: string;
   };
 };
 
